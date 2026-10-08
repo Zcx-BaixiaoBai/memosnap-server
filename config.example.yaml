@@ -1,0 +1,65 @@
+# memosnap-server 配置示例 —— 对应 docs/design.md §7
+# 复制为 config.yaml 后按需修改。密钥一律走环境变量（*_env 填变量名），不落本文件。
+
+deployment:
+  # core 跑在哪台主机由"装在哪"决定（局域网 PC / 公网 IP 主机），不是 core 的模式。
+  # 工牌上传地址在设备侧配（配网页填 core 的可达地址；公网主机则随处可传）。
+  data_dir: ./data                     # 段/逐字稿/纪要/日报/index.db 落这里
+  model_dir: ""                        # 本地模型缓存目录；全 API 留空
+  retention_days: 90
+  listen: 0.0.0.0:8788                 # ingest 监听地址
+  # 设备上传鉴权（X-Gateway-Token）；空=拒绝启动。自生成：
+  #   python -c "import secrets;print(secrets.token_hex(16))"
+  token: ""
+
+capabilities:
+  asr:
+    provider: minimax                  # local-sherpa|local-funasr|minimax|openai-compatible|aliyun|tencent|iflytek
+    local: {runtime: directml, model: sense-voice-zh-en-ja-ko-yue}
+    # region=cn 实测解析到 api.minimaxi.com（mmx config show 为准）
+    api:
+      base_url: https://api.minimaxi.com/v1
+      api_key_env: MINIMAX_API_KEY
+      model: asr-1.0
+      response_format: verbose_json    # 一次返回文本+匿名说话人+时间戳
+      region: cn
+    fallback: []                       # 只允许同隐私边界内降级；跨边界降级必须显式列出
+
+  diarization:
+    provider: asr-tags                 # asr=minimax 时复用其 speaker 标签；本地路径填 local-sherpa
+
+  voiceprint:
+    provider: local-only               # 硬约束：永远 core 主机本地，不发第三方 API（代码层不接受其它值）
+    local:
+      model: models/voiceprint/campplus_zh.onnx   # 3D-Speaker CAM++ zh 16k（下载见 README）
+      threshold: 0.5                    # 1:N 余弦阈值（实测同声 1.00 / 异声 0.35）
+
+  emotion:
+    provider: llm-infer                # MiniMax ASR 无情绪标签→LLM 文本推断；本地路径填 asr-tags
+
+  summarize:
+    provider: minimax
+    api:
+      base_url: https://api.minimaxi.com    # Anthropic 兼容端点在根下（/anthropic/v1/messages），不带 /v1
+      model: MiniMax-M3                     # 套餐配额桶名叫 general，模型 ID 是 MiniMax-M3
+      api_key_env: MINIMAX_API_KEY
+    local: {provider: ollama, model: qwen2.5:7b-instruct-q4}
+    redact: true                       # 出网前人名→角色标签（默认开，design §5.6 混合脱敏）
+    redact_names:                      # 人名→角色标签映射；出网文本在 LLM 适配器边界替换
+      # 张三: 工程部主管               # ← 示例（占位名）。登记越全，纪要/日报里越不落真名；
+      # 李四: 业主代表                 #    未登记的名字 v1 识别不出（自动 NER 属 local-asr 模块配套）
+
+  report:
+    provider: same-as-summarize
+
+integrations:
+  calendar:
+    provider: feishu                   # feishu | none
+    read: true                         # 读当天日程做会议对齐
+    write: true                        # 回写检测到的临时会议/带截止行动项为飞书事件/任务
+    app_id_env: FEISHU_APP_ID
+    app_secret_env: FEISHU_APP_SECRET
+    # 出站走统一校验（open.feishu.cn 公网 host）
+
+modules: [core]                        # 已装本地模块；全 API 时只有 core
+local_endpoints: []                    # 仅装 local-llm(Ollama) 时填 127.0.0.1:11434；只接受环回

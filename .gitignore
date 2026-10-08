@@ -1,0 +1,34 @@
+# 凭据与本地运行态（永不入库）
+.env
+.env-*
+!.env.example
+config.yaml
+config-local.yaml
+*.pem
+
+# 数据与模型（含录音/声纹/逐字稿，隐私数据）
+data/
+data_*/
+smoke-data/
+models/
+*.db
+*.frec
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 工具产物
+tools/bench_out/
+*.log
+
+# 编辑器/系统
+.DS_Store
+.idea/
+.vscode/
+
+# 安全钩子状态
+.mimosa/
+**/.mimosa/

@@ -1,0 +1,8 @@
+# recorder-server 依赖（core，零模型依赖）
+# 本地模型模块（local-asr / local-llm）的依赖在各自模块的 requirements 里，按部署选择安装。
+PyYAML>=6.0
+requests>=2.31
+# 声纹（M4 voiceprint，local-only）+ 音频解码（soundfile 自带 opus 支持，替代 ffmpeg）
+numpy>=1.26
+soundfile>=0.12
+sherpa-onnx>=1.13
